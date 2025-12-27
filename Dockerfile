@@ -22,6 +22,7 @@ RUN apt-get update && \
       nodejs \
       npm \
       build-essential \
+      procps \
       && \
     rm -rf /var/lib/apt/lists/* && \
     echo "gem: --no-document" > /root/.gemrc && \
