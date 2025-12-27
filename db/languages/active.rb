@@ -20,9 +20,6 @@
     name: "Multi-file program",
     is_archived: true,
   },
-  # -------------------------------------------------------------------------
-  # Bash (5.3)
-  # -------------------------------------------------------------------------
   {
     id:90,
     name: "Bash (5.3)",
@@ -57,7 +54,7 @@
     name: "C++ (GCC 15.2.0)",
     is_archived: false,
     source_file: "main.cpp",
-    compile_cmd: "/usr/local/bin/g++ %s main.cpp",
+    compile_cmd: "/usr/local/bin/g++ -static-libgcc -static-libstdc++ %s main.cpp",
     run_cmd: "./a.out"
   },
   {
@@ -65,7 +62,7 @@
     name: "C++ 17 (GCC 15.2.0)",
     is_archived: false,
     source_file: "main.cpp",
-    compile_cmd: "/usr/local/bin/g++ -std=c++17 %s main.cpp",
+    compile_cmd: "/usr/local/bin/g++ -std=c++17 -static-libgcc -static-libstdc++ %s main.cpp",
     run_cmd: "./a.out"
   },
   {
@@ -73,7 +70,7 @@
     name: "C++ 20 (GCC 15.2.0)",
     is_archived: false,
     source_file: "main.cpp",
-    compile_cmd: "/usr/local/bin/g++ -std=c++20 %s main.cpp",
+    compile_cmd: "/usr/local/bin/g++ -std=c++20 -static-libgcc -static-libstdc++ %s main.cpp",
     run_cmd: "./a.out"
   },
   # -------------------------------------------------------------------------
