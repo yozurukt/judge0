@@ -41,6 +41,7 @@ export QUEUE=${JUDGE0_VERSION:-unknown} # This option is not available in judge0
 # Database
 export REDIS_HOST=${REDIS_HOST:-localhost}
 export REDIS_PORT=${REDIS_PORT:-6379}
+export REDIS_DB=${REDIS_DB:-0}
 export POSTGRES_HOST=${POSTGRES_HOST:-localhost}
 export POSTGRES_PORT=${POSTGRES_PORT:-5432}
 export POSTGRES_DB=${POSTGRES_DB:-postgres}
