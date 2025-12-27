@@ -657,10 +657,5 @@
     source_file: "script.groovy",
     compile_cmd: "/usr/local/groovy-3.0.3/bin/groovyc %s script.groovy",
     run_cmd: "/usr/local/bin/java -cp \".:/usr/local/groovy-3.0.3/lib/*\" script"
-  },
-  {
-    id: 89,
-    name: "Multi-file program",
-    is_archived: false,
   }
 ]

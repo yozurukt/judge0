@@ -123,6 +123,6 @@
     source_file: "Main.kt",
     compile_cmd: "/usr/local/kotlin-1.9.0/bin/kotlinc %s Main.kt",
     run_cmd: "/usr/local/kotlin-1.9.0/bin/kotlin MainKt"
-  },
+  }
 
 ]
