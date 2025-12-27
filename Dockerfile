@@ -1,4 +1,4 @@
-FROM judge0/compilers:1.4.0 AS production
+FROM yozuru/judge0-compilers:1.7.0 AS production
 
 ENV JUDGE0_HOMEPAGE "https://judge0.com"
 LABEL homepage=$JUDGE0_HOMEPAGE
@@ -43,7 +43,7 @@ RUN useradd -u 1000 -m -r judge0 && \
 
 USER judge0
 
-ENV JUDGE0_VERSION "1.13.1"
+ENV JUDGE0_VERSION "1.13.2"
 LABEL version=$JUDGE0_VERSION
 
 
