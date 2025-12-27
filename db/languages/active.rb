@@ -110,9 +110,8 @@
     name: "Kotlin (2.3.0)",
     is_archived: false,
     source_file: "Main.kt",
-    compile_cmd: "JAVA_HOME=/usr/local/openjdk21 JAVA_OPTS='-Xmx256m' /usr/local/kotlin-2.3.0/bin/kotlinc %s Main.kt",
-    # 运行命令也建议指定 JAVA_HOME
-    run_cmd: "JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-2.3.0/bin/kotlin MainKt"
+    compile_cmd: "JAVA_OPTS='-Xmx256m' /usr/local/kotlin-2.3.0/bin/kotlinc %s Main.kt",
+    run_cmd: "/usr/local/kotlin-2.3.0/bin/kotlin MainKt"
   },
   {
     id: 100,
