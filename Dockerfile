@@ -1,3 +1,5 @@
+FROM ruby:4.0.0-bookworm AS ruby-source
+
 FROM yozuru/judge0-compilers:1.7.0 AS production
 
 ENV JUDGE0_HOMEPAGE "https://judge0.com"
@@ -9,31 +11,30 @@ LABEL source_code=$JUDGE0_SOURCE_CODE
 ENV JUDGE0_MAINTAINER "Herman Zvonimir Došilović <hermanz.dosilovic@gmail.com>"
 LABEL maintainer=$JUDGE0_MAINTAINER
 
-ENV GEM_HOME="/usr/local/bundle"
-ENV PATH $GEM_HOME/bin:$GEM_HOME/gems/bin:$PATH
+# -----------------------------------------------------------------------------
+# Ruby 4.0.0 (from official image)
+# -----------------------------------------------------------------------------
+COPY --from=ruby-source /usr/local /usr/local
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       cron \
       libpq-dev \
       sudo \
-      ruby-full \
-      ruby-dev \
       nodejs \
       npm \
-      build-essential \
       procps \
+      libyaml-dev \
       && \
     rm -rf /var/lib/apt/lists/* && \
-    echo "gem: --no-document" > /root/.gemrc && \
-    gem install bundler && \
+    ldconfig && \
     npm install -g --unsafe-perm aglio@2.3.0
 
 EXPOSE 2358
 
 WORKDIR /api
 
-COPY Gemfile* ./
+COPY Gemfile ./
 
 RUN RAILS_ENV=production bundle install
 
