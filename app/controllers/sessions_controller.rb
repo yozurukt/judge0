@@ -21,12 +21,13 @@ class SessionsController < ActionController::API
   end
 
   def authenticate_request
-    head :unauthorized if safe_compare(Rails.application.secrets.authn_token, Rails.application.secrets.authn_header)
+    head :unauthorized if safe_compare(ENV.fetch('AUTHN_TOKEN', '').to_s.strip, ENV.fetch('AUTHN_HEADER', 'X-Auth-Token'))
   end
 
   def authorize_request
-    head :forbidden unless Rails.application.secrets.authz_token.present?
-    head :forbidden if safe_compare(Rails.application.secrets.authz_token, Rails.application.secrets.authz_header)
+    authz_token = ENV.fetch('AUTHZ_TOKEN', '').to_s.strip
+    head :forbidden unless authz_token.present?
+    head :forbidden if safe_compare(authz_token, ENV.fetch('AUTHZ_HEADER', 'X-Auth-User'))
   end
 
   def check_maintenance

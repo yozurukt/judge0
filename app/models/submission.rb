@@ -80,8 +80,9 @@ class Submission < ApplicationRecord
   before_validation :set_defaults
 
   enumeration :status
-
   default_scope { order(created_at: :desc) }
+
+
 
   self.per_page = 20
 

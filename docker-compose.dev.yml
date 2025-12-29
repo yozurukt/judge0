@@ -3,13 +3,18 @@ services:
     image: yozuru/judge0:latest
     build:
       context: .
-      target: development
+      target: production
     volumes:
       - .:/api
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     ports:
       - "2358:2358"
       - "3001:3001" # For ./scripts/dev/serve-docs
     privileged: true
+    env_file: judge0.conf
+    environment:
+      - RAILS_ENV=development
+      - SECRET_KEY_BASE=development_secret_key_base_placeholder
 
   db:
     image: postgres:16.2

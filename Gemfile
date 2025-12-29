@@ -14,6 +14,7 @@ gem 'redis', '~> 5.0'
 gem 'resque', '~> 2.7'
 gem 'resque-scheduler', '~> 4.10'
 gem 'will_paginate', '~> 4.0'
+gem 'readline-ext' # Ruby 4.0 compatibility for bundler environment
 
 group :development do
   gem 'annotate', '~> 3.2'
