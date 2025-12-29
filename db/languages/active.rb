@@ -81,16 +81,16 @@
     name: "Java (OpenJDK 25)",
     is_archived: false,
     source_file: "Main.java",
-    compile_cmd: "/usr/local/openjdk25/bin/javac %s Main.java",
-    run_cmd: "/usr/local/openjdk25/bin/java Main"
+    compile_cmd: "JAVA_OPTS='-Xmx256m' /usr/local/openjdk25/bin/javac %s Main.java",
+    run_cmd: "JAVA_OPTS='-Xmx256m' /usr/local/openjdk25/bin/java Main"
   },
   {
     id: 97, 
     name: "Java (OpenJDK 21)",
     is_archived: false,
     source_file: "Main.java",
-    compile_cmd: "/usr/local/openjdk21/bin/javac %s Main.java",
-    run_cmd: "/usr/local/openjdk21/bin/java Main"
+    compile_cmd: "JAVA_OPTS='-Xmx256m' /usr/local/openjdk21/bin/javac %s Main.java",
+    run_cmd: "JAVA_OPTS='-Xmx256m'/usr/local/openjdk21/bin/java Main"
   },
   # -------------------------------------------------------------------------
   # Python (3.14.2)
@@ -110,16 +110,16 @@
     name: "Kotlin (2.3.0)",
     is_archived: false,
     source_file: "Main.kt",
-    compile_cmd: "JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-2.3.0/bin/kotlinc %s Main.kt",
-    run_cmd: "JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-2.3.0/bin/kotlin MainKt"
+    compile_cmd: "JAVA_OPTS='-Xmx256m' JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-2.3.0/bin/kotlinc %s Main.kt",
+    run_cmd: "JAVA_OPTS='-Xmx256m' JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-2.3.0/bin/kotlin MainKt"
   },
   {
     id: 100,
     name: "Kotlin (1.9.0)",
     is_archived: false,
     source_file: "Main.kt",
-    compile_cmd: "JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-1.9.0/bin/kotlinc %s Main.kt",
-    run_cmd: "JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-1.9.0/bin/kotlin MainKt"
+    compile_cmd: "JAVA_OPTS='-Xmx256m' JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-1.9.0/bin/kotlinc %s Main.kt",
+    run_cmd: "JAVA_OPTS='-Xmx256m' JAVA_HOME=/usr/local/openjdk21 /usr/local/kotlin-1.9.0/bin/kotlin MainKt"
   }
 
 ]

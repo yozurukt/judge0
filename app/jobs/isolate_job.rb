@@ -152,7 +152,7 @@ class IsolateJob < ApplicationJob
     -k #{Config::MAX_STACK_LIMIT} \
     -p#{Config::MAX_MAX_PROCESSES_AND_OR_THREADS} \
     #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : (cgroups.present? ? "--cg-timing" : "")} \
-    #{submission.enable_per_process_and_thread_memory_limit ? "-m " : (cgroups.present? ? "--cg-mem=" : "-m ")}#{Config::MAX_MEMORY_LIMIT} \
+    #{submission.enable_per_process_and_thread_memory_limit ? "-m #{Config::MAX_MEMORY_LIMIT}" : (cgroups.present? ? "--cg-mem=#{Config::MAX_MEMORY_LIMIT}" : (jvm_language? ? "" : "-m #{Config::MAX_MEMORY_LIMIT}"))} \
     -f #{Config::MAX_MAX_FILE_SIZE} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
@@ -233,7 +233,7 @@ class IsolateJob < ApplicationJob
     -k #{submission.stack_limit} \
     -p#{submission.max_processes_and_or_threads} \
     #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : (cgroups.present? ? "--cg-timing" : "")} \
-    #{submission.enable_per_process_and_thread_memory_limit ? "-m " : (cgroups.present? ? "--cg-mem=" : "-m ")}#{submission.memory_limit} \
+    #{submission.enable_per_process_and_thread_memory_limit ? "-m #{submission.memory_limit}" : (cgroups.present? ? "--cg-mem=#{submission.memory_limit}" : (jvm_language? ? "" : "-m #{submission.memory_limit}"))} \
     -f #{submission.max_file_size} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
@@ -301,6 +301,10 @@ class IsolateJob < ApplicationJob
     end
     `isolate #{cgroups} -b #{box_id} --cleanup`
     raise "Cleanup of sandbox #{box_id} failed." if raise_exception && Dir.exist?(workdir)
+  end
+
+  def jvm_language?
+    submission.language.name.match?(/Java|Kotlin|C#|F#/i)
   end
 
   def reset_metadata_file

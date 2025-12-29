@@ -25,10 +25,12 @@ module IsolateRunner
       end
 
       sleep(wait_time)
-
+      
       total_wait_time += wait_time
+      
+      current_status = Submission.uncached { Submission.where(id: submission_id).pluck(:status_id).first }
 
-      break if !WAITING_STATUSES.include?(Submission.where(id: submission_id).pluck(:status_id).first)
+      break if !WAITING_STATUSES.include?(current_status)
     end
   end
 
