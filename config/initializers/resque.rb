@@ -1,8 +1,8 @@
 Resque.redis = Redis.new(
-  host:     ENV["REDIS_HOST"],
-  port:     ENV["REDIS_PORT"],
-  password: ENV["REDIS_PASSWORD"],
-  thread_safe: true
+  host:     ENV["REDIS_HOST"].presence || 'localhost',
+  db:       ENV["REDIS_DB"].presence,
+  port:     ENV["REDIS_PORT"].presence || 6379,
+  password: ENV["REDIS_PASSWORD"].presence
 )
 
 if ENV["RESQUE_NAMESPACE"].present?

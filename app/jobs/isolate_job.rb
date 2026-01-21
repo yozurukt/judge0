@@ -1,6 +1,9 @@
 class IsolateJob < ApplicationJob
   retry_on RuntimeError, wait: 0.1.seconds, attempts: 100
 
+  # Load BoxPool for thread-safe box_id allocation
+  require_relative '../helpers/box_pool'
+
   queue_as ENV["JUDGE0_VERSION"].to_sym
 
   STDIN_FILE_NAME = "stdin.txt"
@@ -52,9 +55,25 @@ class IsolateJob < ApplicationJob
   private
 
   def initialize_workdir
-    @box_id = submission.id%2147483647
-    @cgroups = (!submission.enable_per_process_and_thread_time_limit || !submission.enable_per_process_and_thread_memory_limit) ? "--cg" : ""
-    @workdir = `isolate #{cgroups} -b #{box_id} --init`.chomp
+    # Acquire box_id from thread-safe pool (eliminates collisions)
+    @box_id = BoxPool.instance.acquire
+    # Enable cgroups v2 for better resource isolation and monitoring
+    @cgroups = "--cg" 
+    require 'open3'
+    # Use explicit shell string to match docker exec behavior and capture stderr
+    cmd = "isolate #{cgroups} -b #{box_id} --init"
+    
+    Rails.logger.info "IsolateJob: Running #{cmd}"
+    stdout, stderr, status = Open3.capture3(cmd)
+    @workdir = stdout.strip
+    
+    if @workdir.empty?
+      # Release box_id if init failed
+      BoxPool.instance.release(box_id)
+      Rails.logger.error "IsolateJob Failed. STDOUT: #{stdout.inspect} STDERR: #{stderr.inspect}"
+      puts "IsolateJob Failed. STDOUT: #{stdout.inspect} STDERR: #{stderr.inspect}" # Force output to docker logs
+      raise "Isolate init failed: #{stderr.strip} (Exit: #{status.exitstatus})"
+    end
     @boxdir = workdir + "/box"
     @tmpdir = workdir + "/tmp"
     @source_file = boxdir + "/" + submission.language.source_file.to_s
@@ -92,7 +111,7 @@ class IsolateJob < ApplicationJob
     -w 4 \
     -k #{Config::MAX_STACK_LIMIT} \
     -p#{Config::MAX_MAX_PROCESSES_AND_OR_THREADS} \
-    #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : "--cg-timing"} \
+    #{submission.enable_per_process_and_thread_time_limit ? "" : ""} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{Config::MAX_MEMORY_LIMIT} \
     -f #{Config::MAX_EXTRACT_SIZE} \
     --run \
@@ -149,13 +168,14 @@ class IsolateJob < ApplicationJob
     -w #{Config::MAX_WALL_TIME_LIMIT} \
     -k #{Config::MAX_STACK_LIMIT} \
     -p#{Config::MAX_MAX_PROCESSES_AND_OR_THREADS} \
-    #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : "--cg-timing"} \
-    #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{Config::MAX_MEMORY_LIMIT} \
+    #{submission.enable_per_process_and_thread_time_limit ? "" : ""} \
+    #{submission.enable_per_process_and_thread_memory_limit ? "-m #{Config::MAX_MEMORY_LIMIT}" : "--cg-mem=#{jvm_language? ? Config::MAX_MEMORY_LIMIT * 3 : Config::MAX_MEMORY_LIMIT}"} \
     -f #{Config::MAX_MAX_FILE_SIZE} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
     -d /etc:noexec \
+    -d /var/local/lib/includes \
     --run \
     -- /bin/bash $(basename #{compile_script}) > #{compile_output_file} \
     "
@@ -230,13 +250,14 @@ class IsolateJob < ApplicationJob
     -w #{submission.wall_time_limit} \
     -k #{submission.stack_limit} \
     -p#{submission.max_processes_and_or_threads} \
-    #{submission.enable_per_process_and_thread_time_limit ? (cgroups.present? ? "--no-cg-timing" : "") : "--cg-timing"} \
-    #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{submission.memory_limit} \
+    #{submission.enable_per_process_and_thread_time_limit ? "" : ""} \
+    #{submission.enable_per_process_and_thread_memory_limit ? "-m #{submission.memory_limit}" : "--cg-mem=#{jvm_language? ? submission.memory_limit * 3 : submission.memory_limit}"} \
     -f #{submission.max_file_size} \
     -E HOME=/tmp \
     -E PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\" \
     -E LANG -E LANGUAGE -E LC_ALL -E JUDGE0_HOMEPAGE -E JUDGE0_SOURCE_CODE -E JUDGE0_MAINTAINER -E JUDGE0_VERSION \
     -d /etc:noexec \
+    -d /var/local/lib/includes \
     --run \
     -- /bin/bash $(basename #{run_script}) \
     < #{stdin_file} > #{stdout_file} 2> #{stderr_file} \
@@ -264,7 +285,7 @@ class IsolateJob < ApplicationJob
 
     submission.time = metadata[:time]
     submission.wall_time = metadata[:"time-wall"]
-    submission.memory = (cgroups.present? ? metadata[:"cg-mem"] : metadata[:"max-rss"])
+    submission.memory = metadata[:"cg-mem"]
     submission.stdout = program_stdout
     submission.stderr = program_stderr
     submission.exit_code = metadata[:exitcode].try(:to_i) || 0
@@ -293,12 +314,22 @@ class IsolateJob < ApplicationJob
 
   def cleanup(raise_exception = true)
     fix_permissions
-    `sudo rm -rf #{boxdir}/* #{tmpdir}/*`
+    # `isolate --cleanup` handles the removal of the box and its contents.
+    # Manual `rm -rf` on boxdir is dangerous because it can delete bind-mounted /dev files
+    # if called before isolate cleanup.
     [stdin_file, stdout_file, stderr_file, metadata_file].each do |f|
       `sudo rm -rf #{f}`
     end
     `isolate #{cgroups} -b #{box_id} --cleanup`
-    raise "Cleanup of sandbox #{box_id} failed." if raise_exception && Dir.exists?(workdir)
+    
+    # Release box_id back to pool
+    BoxPool.instance.release(box_id) if box_id
+    
+    raise "Cleanup of sandbox #{box_id} failed." if raise_exception && Dir.exist?(workdir)
+  end
+
+  def jvm_language?
+    submission.language.name.match?(/Java|Kotlin|C#|F#/i)
   end
 
   def reset_metadata_file
@@ -307,6 +338,8 @@ class IsolateJob < ApplicationJob
   end
 
   def fix_permissions
+    return unless boxdir
+
     `sudo chown -R $(whoami): #{boxdir}`
   end
 
