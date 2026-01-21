@@ -1,22 +1,26 @@
 services:
   judge0:
-    image: judge0/judge0:latest-dev
+    image: yozuru/judge0:latest
     build:
       context: .
-      target: development
+      target: production
     volumes:
-      - .:/api
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     ports:
       - "2358:2358"
       - "3001:3001" # For ./scripts/dev/serve-docs
     privileged: true
+    env_file: judge0.conf
+    environment:
+      - RAILS_ENV=development
+      - SECRET_KEY_BASE=development_secret_key_base_placeholder
 
   db:
     image: postgres:16.2
     env_file: judge0.conf
     volumes:
       - data:/var/lib/postgresql/data/
-    restart: always
+    # restart: always
 
   redis:
     image: redis:7.2.4
@@ -25,7 +29,7 @@ services:
       'docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"'
     ]
     env_file: judge0.conf
-    restart: always
+    # restart: always
 
 volumes:
   data:

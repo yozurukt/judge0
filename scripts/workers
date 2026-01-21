@@ -27,13 +27,13 @@ mkdir -p tmp/pids &> /dev/null
 while [[ $run_resque -eq 1 ]]; do
     echo "[$(date_now)] Starting scheduler."
     if ! ps -p $scheduler_pid &> /dev/null; then
-        rake resque:scheduler &
+        bundle exec rake resque:scheduler &
         scheduler_pid=$!
     fi
 
     rm -rf tmp/pids/resque.pid &> /dev/null
     echo "[$(date_now)] Starting workers."
-    rails resque:workers &
+    bundle exec rails resque:workers &
     resque_pid=$!
     while ps -p $resque_pid > /dev/null; do sleep 1s; done
     echo "[$(date_now)] Workers are stopped."
