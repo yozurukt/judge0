@@ -86,7 +86,7 @@ RUN useradd -u 1000 -m -r judge0 && \
 
 USER judge0
 
-ENV JUDGE0_VERSION="1.13.2"
+ENV JUDGE0_VERSION="1.14.0"
 LABEL version=$JUDGE0_VERSION
 
 FROM production AS development

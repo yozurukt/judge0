@@ -1,4 +1,15 @@
-This is the Changelog for Judge0 CE. The Changelog for Judge0 Extra CE can be found [here](https://github.com/judge0/judge0/blob/extra/CHANGELOG.md). Learn more about their difference [here](https://github.com/judge0/judge0#flavors).
+# v1.14.0 (2026-01-21)
+This release marks a major upgrade and customization for HUEL OJ, maintained by Yozuru.
+
+## Key Changes
+- **Core Framework Upgrade**: Updated Ruby to 4.0 and Rails to 7.2 for enhanced performance and security.
+- **Infrastructure Optimization**: Improved `Dockerfile`, implemented `BoxPool` for better resource management, and enabled cgroups v2 support.
+- **HUEL OJ Customization**: Simplified `README.md`, removed commercial/promotional content, and tailored documentation for university use.
+- **Language Support**: Updated `active.rb` with curated languages for the curriculum.
+- **CI/CD**: Added GitHub Actions workflow for automated Docker builds.
+
+## Credits
+- **Maintainer**: Yozuru
 
 # v1.13.1 (2024-04-18)
 Security researcher [Daniel Cooper](https://www.linkedin.com/in/daniel-cooper4) (@stacksparrow4) found three critical vulnerabilities in Judge0 versions `<= 1.13.0`, which this release fixes. Thank you, Daniel, for your contribution.
