@@ -8,11 +8,13 @@ x-logging:
 services:
   server:
     image: judge0/judge0:latest
+    command: ["./scripts/server"]
     volumes:
       - ./judge0.conf:/judge0.conf:ro
     ports:
       - "2358:2358"
     privileged: true
+    cgroup: host
     <<: *default-logging
     restart: always
 
@@ -22,6 +24,7 @@ services:
     volumes:
       - ./judge0.conf:/judge0.conf:ro
     privileged: true
+    cgroup: host
     <<: *default-logging
     restart: always
 

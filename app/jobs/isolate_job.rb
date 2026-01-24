@@ -351,7 +351,7 @@ class IsolateJob < ApplicationJob
       {
         serializer: SubmissionSerializer,
         base64_encoded: true,
-        fields: SubmissionSerializer.default_fields
+        fields: SubmissionSerializer.default_fields + [:language_id, :stdin, :expected_output]
       }
     ).to_json
 
