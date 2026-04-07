@@ -27,9 +27,23 @@ class IsolateJob < ApplicationJob
     submission.number_of_runs.times do
       initialize_workdir
       if compile == :failure
+        # Compile failed: perform full cleanup (including box_id release) and abort.
         cleanup
         return
       end
+
+      # --- Dual-lifecycle sandbox: reset cgroup between compile and run ---
+      # Strategy: backup compiled artifacts to host /tmp, destroy the compile
+      # cgroup via --cleanup (which resets memory.peak at the kernel level),
+      # create a fresh sandbox via --init, then restore artifacts.
+      # This is the only safe way to reset memory.peak without bypassing isolate's
+      # internal state machine.
+      save_artifacts
+      cleanup_compile_box
+      initialize_run_box
+      restore_artifacts
+      # ---------------------------------------------------------------------
+
       run
       verify
 
@@ -74,14 +88,7 @@ class IsolateJob < ApplicationJob
       puts "IsolateJob Failed. STDOUT: #{stdout.inspect} STDERR: #{stderr.inspect}" # Force output to docker logs
       raise "Isolate init failed: #{stderr.strip} (Exit: #{status.exitstatus})"
     end
-    @boxdir = workdir + "/box"
-    @tmpdir = workdir + "/tmp"
-    @source_file = boxdir + "/" + submission.language.source_file.to_s
-    @stdin_file = workdir + "/" + STDIN_FILE_NAME
-    @stdout_file = workdir + "/" + STDOUT_FILE_NAME
-    @stderr_file = workdir + "/" + STDERR_FILE_NAME
-    @metadata_file = workdir + "/" + METADATA_FILE_NAME
-    @additional_files_archive_file = boxdir + "/" + ADDITIONAL_FILES_ARCHIVE_FILE_NAME
+    update_paths
 
     [stdin_file, stdout_file, stderr_file, metadata_file].each do |f|
       initialize_file(f)
@@ -95,6 +102,72 @@ class IsolateJob < ApplicationJob
 
   def initialize_file(file)
     `sudo touch #{file} && sudo chown $(whoami): #{file}`
+  end
+
+  def update_paths
+    @boxdir = workdir + "/box"
+    @tmpdir = workdir + "/tmp"
+    @source_file = boxdir + "/" + submission.language.source_file.to_s
+    @stdin_file = workdir + "/" + STDIN_FILE_NAME
+    @stdout_file = workdir + "/" + STDOUT_FILE_NAME
+    @stderr_file = workdir + "/" + STDERR_FILE_NAME
+    @metadata_file = workdir + "/" + METADATA_FILE_NAME
+    @additional_files_archive_file = boxdir + "/" + ADDITIONAL_FILES_ARCHIVE_FILE_NAME
+  end
+
+  # Save compiled artifacts from boxdir to a host-side temporary directory.
+  # Must be called BEFORE cleanup_compile_box because --cleanup wipes the entire workdir.
+  # Uses a path outside isolate's managed workdir so it survives --cleanup.
+  def save_artifacts
+    @artifact_backup_dir = "/tmp/judge0_artifacts_#{box_id}"
+    FileUtils.mkdir_p(@artifact_backup_dir)
+    `sudo cp -r #{boxdir}/. #{@artifact_backup_dir}/`
+    `sudo chown -R $(whoami): #{@artifact_backup_dir}`
+  end
+
+  # Tear down the compile-phase sandbox via the official isolate API.
+  # Calling --cleanup destroys the cgroup directory at the kernel level, which
+  # is the only correct way to reset memory.peak to 0 for the run phase.
+  # Does NOT release box_id — the same ID will be reused by initialize_run_box.
+  def cleanup_compile_box
+    fix_permissions
+    `isolate #{cgroups} -b #{box_id} --cleanup`
+  end
+
+  # Create a fresh run-phase sandbox using the same box_id.
+  # The new --init creates a brand-new cgroup with memory.peak starting at 0,
+  # completely independent of the compiler's memory usage.
+  def initialize_run_box
+    require 'open3'
+    cmd = "isolate #{cgroups} -b #{box_id} --init"
+    Rails.logger.info "IsolateJob: Re-initialising sandbox for run phase: #{cmd}"
+    stdout, stderr, status = Open3.capture3(cmd)
+    new_workdir = stdout.strip
+
+    if new_workdir.empty?
+      raise "Isolate re-init for run phase failed: #{stderr.strip} (Exit: #{status.exitstatus})"
+    end
+
+    @workdir = new_workdir
+    update_paths
+
+    # Re-create the I/O files that were wiped by cleanup_compile_box.
+    [stdin_file, stdout_file, stderr_file, metadata_file].each do |f|
+      initialize_file(f)
+    end
+    # Re-write stdin because the old file was removed by --cleanup.
+    File.open(stdin_file, "wb") { |f| f.write(submission.stdin) }
+  end
+
+  # Restore the compiled artifacts from the host-side backup into the new boxdir.
+  # Permissions are fixed so that isolate's sandboxed user can read the binaries.
+  def restore_artifacts
+    return unless @artifact_backup_dir && Dir.exist?(@artifact_backup_dir)
+
+    `sudo cp -r #{@artifact_backup_dir}/. #{boxdir}/`
+    fix_permissions
+    FileUtils.rm_rf(@artifact_backup_dir)
+    @artifact_backup_dir = nil
   end
 
   def extract_archive
@@ -111,7 +184,6 @@ class IsolateJob < ApplicationJob
     -w 4 \
     -k #{Config::MAX_STACK_LIMIT} \
     -p#{Config::MAX_MAX_PROCESSES_AND_OR_THREADS} \
-    #{submission.enable_per_process_and_thread_time_limit ? "" : ""} \
     #{submission.enable_per_process_and_thread_memory_limit ? "-m " : "--cg-mem="}#{Config::MAX_MEMORY_LIMIT} \
     -f #{Config::MAX_EXTRACT_SIZE} \
     --run \
@@ -285,6 +357,9 @@ class IsolateJob < ApplicationJob
 
     submission.time = metadata[:time]
     submission.wall_time = metadata[:"time-wall"]
+    # cg-mem accurately reflects only the run step's memory usage because
+    # reset_sandbox destroys and recreates the cgroup between compile and run,
+    # clearing memory.peak to 0.
     submission.memory = metadata[:"cg-mem"]
     submission.stdout = program_stdout
     submission.stderr = program_stderr
@@ -313,6 +388,13 @@ class IsolateJob < ApplicationJob
   end
 
   def cleanup(raise_exception = true)
+    # Guard: if an exception aborted the flow after save_artifacts but before
+    # restore_artifacts, ensure the host-side backup directory is removed.
+    if @artifact_backup_dir
+      FileUtils.rm_rf(@artifact_backup_dir)
+      @artifact_backup_dir = nil
+    end
+
     fix_permissions
     # `isolate --cleanup` handles the removal of the box and its contents.
     # Manual `rm -rf` on boxdir is dangerous because it can delete bind-mounted /dev files
@@ -321,10 +403,10 @@ class IsolateJob < ApplicationJob
       `sudo rm -rf #{f}`
     end
     `isolate #{cgroups} -b #{box_id} --cleanup`
-    
-    # Release box_id back to pool
+
+    # Release box_id back to pool.
     BoxPool.instance.release(box_id) if box_id
-    
+
     raise "Cleanup of sandbox #{box_id} failed." if raise_exception && Dir.exist?(workdir)
   end
 
